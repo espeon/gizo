@@ -5,8 +5,7 @@ edition = "2021"
 
 [dependencies]
 axum = { version = "0.8.1", features = ["macros"] }
-axum-limit = "0.1.0-alpha.2"
-governor = "0.8.0"
+#governor = "0.8.0"
 hyper = "1.6.0"
 image = "0.25.5"
 lazy_static = "1.5.0"

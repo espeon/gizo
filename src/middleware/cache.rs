@@ -19,6 +19,7 @@ pub struct CacheConfig {
 #[derive(Clone)]
 struct CacheEntry {
     data: Bytes,
+    headers: HeaderMap,
     expires_at: Instant,
 }
 
@@ -44,22 +45,23 @@ impl MemoryCache {
         Self { store }
     }
 
-    pub async fn get(&self, key: &str) -> Option<Bytes> {
+    pub async fn get(&self, key: &str) -> Option<(HeaderMap, Bytes)> {
         let cache = self.store.read().await;
         if let Some(entry) = cache.get(key) {
             if entry.expires_at > Instant::now() {
-                return Some(entry.data.clone());
+                return Some((entry.headers.clone(), entry.data.clone()));
             }
         }
         None
     }
 
-    pub async fn set(&self, key: String, value: Bytes, ttl: Duration) {
+    pub async fn set(&self, key: String, value: Bytes, headers: HeaderMap, ttl: Duration) {
         let mut cache = self.store.write().await;
         cache.insert(
             key,
             CacheEntry {
                 data: value,
+                headers,
                 expires_at: Instant::now() + ttl,
             },
         );
@@ -80,13 +82,24 @@ pub async fn cache_middleware(
     let cache_key = generate_cache_key(&req);
 
     // Try to get from cache
-    if let Some(cached_response) = cache.get(&cache_key).await {
-        let mut headers = HeaderMap::new();
+    if let Some((headers, cached_response)) = cache.get(&cache_key).await {
+        let mut headers = headers;
         headers.insert("x-gizo-cache", "HIT".parse().unwrap());
-        return Ok(Response::builder()
+        let mut res = Response::builder();
+        {
+            let headers_res = res.headers_mut().unwrap();
+            for (key, value) in headers.drain() {
+                if let Some(key) = key {
+                    headers_res.insert(key, value);
+                }
+            }
+        };
+
+        let res = res
             .status(StatusCode::OK)
             .body(Body::from(cached_response))
-            .unwrap());
+            .unwrap();
+        return Ok(res);
     }
 
     // If not in cache, proceed with request
@@ -97,7 +110,14 @@ pub async fn cache_middleware(
         // Cache all responses under 32mb
         let body_bytes = body::to_bytes(body, 32 * 1024 * 1024).await.unwrap();
 
-        cache.set(cache_key, body_bytes.clone(), config.ttl).await;
+        cache
+            .set(
+                cache_key,
+                body_bytes.clone(),
+                pts.headers.clone(),
+                config.ttl,
+            )
+            .await;
         response = Response::from_parts(pts, Body::from(body_bytes));
     }
 

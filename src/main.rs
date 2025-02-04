@@ -1,8 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
 use axum::{middleware as axum_middleware, routing::get, Router};
-use axum_limit::LimitState;
-use hyper::Uri;
 use middleware::cache::{cache_middleware, CacheConfig, MemoryCache};
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
