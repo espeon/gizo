@@ -84,7 +84,7 @@ pub async fn cache_middleware(
     // Try to get from cache
     if let Some((headers, cached_response)) = cache.get(&cache_key).await {
         let mut headers = headers;
-        headers.insert("x-gizo-cache", "HIT".parse().unwrap());
+        headers.insert("x-debug-gizo-cache", "HIT".parse().unwrap());
         let mut res = Response::builder();
         {
             let headers_res = res.headers_mut().unwrap();
@@ -123,7 +123,7 @@ pub async fn cache_middleware(
 
     {
         let headers = response.headers_mut();
-        headers.insert("x-gizo-cache", "MISS".parse().unwrap());
+        headers.insert("x-debug-gizo-cache", "MISS".parse().unwrap());
     }
 
     Ok(response)
