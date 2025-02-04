@@ -104,12 +104,14 @@ pub fn collate_og_tags(tags: Vec<MetaTag>) -> OpenGraphResponse {
     for tag in &tags {
         match &tag.tag_type {
             TagType::Name(name) => match name.as_str() {
-                "og:title" => response.title = tag.content.clone(),
+                "og:title" | "twitter:title" => response.title = tag.content.clone(),
                 "og:type" => response.og_type = Some(tag.content.clone()),
                 "og:url" => response.url = tag.content.clone(),
                 "og:image" => response.image = Some(tag.content.clone()),
                 "og:audio" => response.audio = Some(tag.content.clone()),
-                "og:description" => response.description = Some(tag.content.clone()),
+                "og:description" | "twitter:description" => {
+                    response.description = Some(tag.content.clone())
+                }
                 "og:site_name" => response.site_name = Some(tag.content.clone()),
                 "og:video" => response.video = Some(tag.content.clone()),
                 _ => {}
