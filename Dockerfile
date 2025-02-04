@@ -12,7 +12,7 @@ WORKDIR /usr/src/app
 
 # Install musl-tools and set up the appropriate target
 RUN apt-get update && \
-    apt-get install -y musl-tools && \
+    apt-get install -y musl-tools gcc-aarch64-linux-gnu && \
     rustup target add $(cat /target_arch)
 
 # Copy the manifest files
