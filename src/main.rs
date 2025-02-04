@@ -7,7 +7,7 @@ use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 
 mod error;
-pub mod handlers;
+mod handlers;
 mod img;
 mod metadata;
 mod models;
