@@ -36,6 +36,9 @@ pub fn create_router() -> Router {
         ttl: Duration::from_secs(3600), // 1 hour
     });
     Router::new()
+        // cardyb compat route
+        .route("/v1/image", get(handlers::proxy_image))
+        .route("/v1/extract", get(handlers::extract_metadata_cardyb))
         .route("/api/v1/extract", get(handlers::extract_metadata))
         .route("/api/v1/image", get(handlers::proxy_image))
         .layer(

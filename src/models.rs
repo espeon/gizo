@@ -55,3 +55,37 @@ impl Default for OpenGraphResponse {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CardyBResponse {
+    pub error: String,
+    pub likely_type: String,
+    pub url: String,
+    pub title: String,
+    pub description: String,
+    pub image: String,
+}
+
+impl From<OpenGraphResponse> for CardyBResponse {
+    fn from(og: OpenGraphResponse) -> Self {
+        // we NEED url and title
+        if og.url.is_empty() || og.title.is_empty() {
+            return CardyBResponse {
+                error: "Unable to generate link preview".to_string(),
+                likely_type: "".to_string(),
+                url: "".to_string(),
+                title: "".to_string(),
+                description: "".to_string(),
+                image: "".to_string(),
+            };
+        }
+        CardyBResponse {
+            error: "".to_string(),
+            likely_type: og.og_type.unwrap_or("website".to_string()),
+            url: og.url,
+            title: og.title,
+            description: og.description.unwrap_or("".to_string()),
+            image: og.image.unwrap_or("".to_string()),
+        }
+    }
+}

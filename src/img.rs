@@ -36,7 +36,8 @@ fn process_image(bytes: &[u8]) -> Result<Vec<u8>, AppError> {
     let mut buffer = Vec::new();
     img.write_to(
         &mut std::io::Cursor::new(&mut buffer),
-        image::ImageFormat::WebP,
+        // i'd really like to use webp here but bsky themselves use jpeg
+        image::ImageFormat::Jpeg,
     )
     .map_err(|_| AppError::ImageProcessingError)?;
 

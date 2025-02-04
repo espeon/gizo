@@ -129,9 +129,11 @@ pub fn collate_og_tags(tags: Vec<MetaTag>) -> OpenGraphResponse {
     }
     // site-specific overrides
 
-    // YouTube
-    if response.url.starts_with("https://youtube.com")
-        || response.url.starts_with("https://www.youtube.com")
+    // YouTube (videos and shorts)
+    if response.url.starts_with("https://youtube.com/watch")
+        || response.url.starts_with("https://www.youtube.com/watch")
+        || response.url.starts_with("https://youtube.com/shorts")
+        || response.url.starts_with("https://www.youtube.com/shorts")
     {
         // get link:name tag
         let mut link_name = String::new();
@@ -142,7 +144,12 @@ pub fn collate_og_tags(tags: Vec<MetaTag>) -> OpenGraphResponse {
                 }
             }
         }
-        response.description = Some("Youtube video by ".to_string() + &link_name);
+        let item_type = if response.url.contains("/shorts") {
+            "short"
+        } else {
+            "video"
+        };
+        response.description = Some(format!("Youtube {} by {}", item_type, &link_name));
     }
 
     // convert image to proxy url
@@ -159,6 +166,8 @@ pub fn collate_og_tags(tags: Vec<MetaTag>) -> OpenGraphResponse {
 
 #[cfg(test)]
 mod tests {
+    use crate::models::CardyBResponse;
+
     use super::*;
 
     #[test]
@@ -181,6 +190,23 @@ mod tests {
         </body>
         </html>"#;
         let tags = get_open_graph_tags(header);
-        assert_eq!(tags.len(), 7);
+        assert_eq!(tags.len(), 10);
+
+        let collated = collate_og_tags(tags);
+        assert_eq!(collated.title, "The Beatles - Hey Jude");
+        assert_eq!(
+            collated.url,
+            "https://music.apple.com/us/album/hey-jude/1435546686"
+        );
+        assert_eq!(collated.image, Some("https://cardyb.bsky.app/v1/image?url=https%3A%2F%2Fis3-ssl.mzstatic.com%2Fimage%2Fthumb%2FMusic128%2Fv4%2Fc8%2Fb8%2Ff5%2Fc8b8f5d0-b5a6-c5e1-a5f9-f7e8f2e6f0e2%2F88229964-e0b9-4c3d-8b6c-d2f8c9f3a2d8.jpg%2F170x170bb.jpg".to_string()));
+
+        // to cardyb
+        let collated: CardyBResponse = collated.into();
+        assert_eq!(collated.likely_type, "music.song");
+        assert_eq!(
+            collated.url,
+            "https://music.apple.com/us/album/hey-jude/1435546686"
+        );
+        assert_eq!(collated.title, "The Beatles - Hey Jude");
     }
 }
