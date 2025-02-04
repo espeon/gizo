@@ -12,8 +12,13 @@ WORKDIR /usr/src/app
 
 # Install musl-tools and set up the appropriate target
 RUN apt-get update && \
-    apt-get install -y musl-tools gcc-aarch64-linux-musl && \
+    apt-get install -y musl-tools clang llvm && \
     rustup target add $(cat /target_arch)
+
+ENV CC_aarch64_unknown_linux_musl=clang
+ENV AR_aarch64_unknown_linux_musl=llvm-ar
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-Clink-self-contained=yes -Clinker=rust-lld"
+
 
 # Copy the manifest files
 COPY Cargo.toml Cargo.lock ./
