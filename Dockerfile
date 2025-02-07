@@ -1,48 +1,41 @@
-FROM --platform=$BUILDPLATFORM rust:latest as builder
+FROM rust:alpine3.21 AS chef
 
-# Set the target platform architecture
-ARG TARGETPLATFORM
-RUN case "$TARGETPLATFORM" in \
-    "linux/amd64")  echo "x86_64-unknown-linux-musl" > /target_arch ;; \
-    "linux/arm64")  echo "aarch64-unknown-linux-musl" > /target_arch ;; \
-    *)             echo "Unsupported platform: $TARGETPLATFORM" && exit 1 ;; \
-    esac
+WORKDIR /app
 
-WORKDIR /usr/src/app
+RUN apk update
+RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static
 
-# Install musl-tools and set up the appropriate target
-RUN apt-get update && \
-    apt-get install -y musl-tools clang llvm && \
-    rustup target add $(cat /target_arch)
+RUN cargo install cargo-chef
 
-ENV CC_aarch64_unknown_linux_musl=clang
-ENV AR_aarch64_unknown_linux_musl=llvm-ar
-ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-Clink-self-contained=yes -Clinker=rust-lld"
+# planner
+FROM chef AS planner
 
+COPY . .
 
-# Copy the manifest files
-COPY Cargo.toml Cargo.lock ./
+RUN cargo chef prepare --recipe-path recipe.json
+# end planner
 
-# Create a dummy main.rs to build dependencies
-RUN mkdir src && \
-    echo "fn main() {}" > src/main.rs && \
-    cargo build --release --target $(cat /target_arch) && \
-    rm -rf src
+# cook
+FROM chef AS cook
 
-# Copy the actual source code
-COPY src ./src
+COPY --from=planner /app/recipe.json recipe.json
 
-# Build the static binary
-RUN touch src/main.rs && \
-    cargo build --release --target $(cat /target_arch)
+RUN cargo chef cook --release --recipe-path recipe.json
+# end cook
 
+# builder
+FROM cook AS builder
+
+COPY . .
+
+RUN cargo build --release
+# end builder
+
+# runner
 FROM scratch
 
-# Copy the static binary from builder
-COPY --from=builder /usr/src/app/target/$(cat /target_arch)/release/gizo /app
+COPY --from=builder /app/target/release/gizo /app
 
-# Expose the port
 EXPOSE 3000
 
-# Run the binary
 CMD ["/app"]
