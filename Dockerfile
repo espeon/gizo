@@ -1,9 +1,6 @@
-FROM rust:alpine3.21 AS chef
+FROM --platform=${BUILDPLATFORM} rust:latest AS chef
 
-WORKDIR /app
-
-RUN apk update
-RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static
+RUN update-ca-certificates
 
 RUN cargo install cargo-chef
 
@@ -12,30 +9,71 @@ FROM chef AS planner
 
 COPY . .
 
-RUN cargo chef prepare --recipe-path recipe.json
-# end planner
+#RUN rm -f rust-toolchain.toml
 
-# cook
+RUN cargo chef prepare --recipe-path recipe.json
+
 FROM chef AS cook
 
-COPY --from=planner /app/recipe.json recipe.json
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libssl-dev \
+    pkgconf \
+    gcc-aarch64-linux-gnu \
+    gcc-x86-64-linux-gnu \
+    libc6-dev-arm64-cross \
+    libc6-dev-amd64-cross \
+    && rm -rf /var/lib/apt/lists/
 
-RUN cargo chef cook --release --recipe-path recipe.json
-# end cook
 
-# builder
-FROM cook AS builder
+ARG TARGETPLATFORM
 
-COPY . .
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=x86_64-linux-gnu-gcc
 
-RUN cargo build --release
-# end builder
+#COPY rust-toolchain.toml rust-toolchain.toml
 
-# runner
-FROM scratch
+COPY --from=planner recipe.json recipe.json
 
-COPY --from=builder /app/target/release/gizo /app
+COPY target.sh target.sh
 
-EXPOSE 3000
+RUN . ./target.sh && rustup target add $RUST_TARGET
+RUN . ./target.sh && cargo chef cook --release --target $RUST_TARGET --recipe-path recipe.json
 
-CMD ["/app"]
+
+FROM cook AS buildah
+
+# Create appuser
+ENV USER=app
+ENV UID=10001
+
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "/nonexistent" \
+    --shell "/sbin/nologin" \
+    --no-create-home \
+    --uid "${UID}" \
+    "${USER}"
+
+WORKDIR /buildah
+
+COPY ./ .
+
+RUN . ./target.sh && touch src/main.rs && echo "Building for $TARGET_ARCH" && cargo build --release --target $RUST_TARGET && cp target/$RUST_TARGET/release/geranium target/geranium
+
+FROM --platform=${TARGETARCH:-$BUILDPLATFORM} gcr.io/distroless/cc
+
+# Import from builder.
+COPY --from=buildah /etc/passwd /etc/passwd
+COPY --from=buildah /etc/group /etc/group
+
+WORKDIR /app
+
+# Copy our build
+COPY --from=buildah /buildah/target/geranium ./
+
+# Use an unprivileged user.
+USER app:app
+
+CMD ["/app/geranium"]
