@@ -60,7 +60,7 @@ WORKDIR /buildah
 
 COPY ./ .
 
-RUN . ./target.sh && touch src/main.rs && echo "Building for $TARGET_ARCH" && cargo build --release --target $RUST_TARGET && cp target/$RUST_TARGET/release/geranium target/geranium
+RUN . ./target.sh && touch src/main.rs && echo "Building for $TARGET_ARCH" && cargo build --release --target $RUST_TARGET && cp target/$RUST_TARGET/release/gizo target/gizo
 
 FROM --platform=${TARGETARCH:-$BUILDPLATFORM} gcr.io/distroless/cc
 
@@ -71,9 +71,9 @@ COPY --from=buildah /etc/group /etc/group
 WORKDIR /app
 
 # Copy our build
-COPY --from=buildah /buildah/target/geranium ./
+COPY --from=buildah /buildah/target/gizo ./
 
 # Use an unprivileged user.
 USER app:app
 
-CMD ["/app/geranium"]
+CMD ["/app/gizo"]
